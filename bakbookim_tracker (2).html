@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>מעקב הזמנות בקבוקים</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#f4f4f4;color:#222;direction:rtl;font-size:15px}
+.app{max-width:780px;margin:0 auto;padding:1.5rem}
+h1{font-size:22px;font-weight:700;margin-bottom:1.2rem}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:1.2rem}
+.stat{background:#fff;border-radius:10px;padding:14px;border:1px solid #e5e5e5;text-align:center}
+.stat-label{font-size:12px;color:#888;margin-bottom:4px}
+.stat-val{font-size:26px;font-weight:700}
+.stat-val.warn{color:#c47a00}
+.stat-val.ok{color:#2d7a2d}
+.stat-val.danger{color:#c0392b}
+.top-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:10px;flex-wrap:wrap}
+.tabs{display:flex;gap:0;border:1px solid #ddd;border-radius:8px;overflow:hidden}
+.tab{background:#fff;border:none;padding:8px 16px;font-size:13px;color:#888;cursor:pointer;font-family:Arial;font-weight:600}
+.tab.active{background:#111;color:#fff}
+.btn{background:#fff;border:1px solid #ddd;border-radius:8px;padding:8px 16px;font-size:13px;cursor:pointer;font-family:Arial;font-weight:600}
+.btn:hover{background:#f5f5f5}
+.btn.primary{background:#111;color:#fff;border-color:#111}
+.btn.primary:hover{background:#333}
+.btn.success{background:#2d7a2d;color:#fff;border-color:#2d7a2d}
+.btn.danger{color:#c0392b;border-color:#fca5a5;background:#fff}
+.btn.sm{padding:5px 12px;font-size:12px}
+.orders-list{display:flex;flex-direction:column;gap:10px}
+.order-card{background:#fff;border:1px solid #e0e0e0;border-radius:12px;overflow:hidden}
+.order-card.overdue{border-right:4px solid #e74c3c}
+.order-header{padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+.order-header:hover{background:#fafafa}
+.order-num{font-size:17px;font-weight:700;color:#111}
+.order-sub{font-size:12px;color:#888;margin-top:3px}
+.progress-wrap{margin-top:6px;display:flex;align-items:center;gap:8px}
+.progress-bar{flex:1;height:6px;background:#eee;border-radius:3px;overflow:hidden}
+.progress-fill{height:100%;background:#2d7a2d;border-radius:3px;transition:width .3s}
+.progress-txt{font-size:11px;color:#888;white-space:nowrap;min-width:50px}
+.badge{font-size:11px;padding:4px 10px;border-radius:20px;font-weight:700;white-space:nowrap}
+.badge.partial{background:#fef3c7;color:#92400e}
+.badge.missing{background:#fee2e2;color:#991b1b}
+.badge.arrived{background:#dcfce7;color:#166534}
+.badge.pending{background:#dbeafe;color:#1e40af}
+.chevron{font-size:11px;color:#bbb;transition:transform .2s;flex-shrink:0}
+.chevron.open{transform:rotate(180deg)}
+.order-body{display:none;border-top:1px solid #f0f0f0;padding:14px 16px;background:#fafafa}
+.order-body.open{display:block}
+.missing-box{background:#fff3f3;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:#991b1b}
+.missing-box strong{display:block;margin-bottom:4px}
+.project-block{margin-bottom:14px}
+.project-name{font-size:13px;font-weight:700;color:#444;margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid #eee}
+.items-list{display:flex;flex-direction:column;gap:6px}
+.item-row{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff;border-radius:8px;border:1px solid #eee}
+.item-row.done{background:#f0fdf4;border-color:#bbf7d0}
+.item-check{width:20px;height:20px;cursor:pointer;accent-color:#2d7a2d;flex-shrink:0}
+.item-name{flex:1;font-size:14px}
+.item-name.checked{text-decoration:line-through;color:#aaa}
+.item-qty{font-size:12px;color:#666;background:#f0f0f0;padding:2px 9px;border-radius:20px;white-space:nowrap}
+.action-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;padding-top:10px;border-top:1px solid #eee}
+.add-row{display:flex;gap:8px;margin-top:10px}
+.add-row input{font-size:13px;padding:7px 10px;border-radius:8px;border:1px solid #ddd;font-family:Arial;background:#fff}
+.add-row input.wide{flex:1}
+.add-row input.narrow{width:65px}
+.alert{background:#fef3c7;border-radius:8px;padding:11px 14px;font-size:13px;color:#92400e;margin-bottom:1rem;font-weight:600}
+.empty{text-align:center;padding:2.5rem;color:#aaa;font-size:14px;line-height:2}
+.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.5);z-index:100;align-items:flex-start;justify-content:center;padding:1rem;overflow-y:auto}
+.modal-bg.open{display:flex}
+.modal{background:#fff;border-radius:14px;padding:1.5rem;width:100%;max-width:500px;margin:auto}
+.modal h2{font-size:18px;font-weight:700;margin-bottom:1rem}
+.modal-tabs{display:flex;gap:0;margin-bottom:1.2rem;border:1px solid #ddd;border-radius:8px;overflow:hidden}
+.modal-tab{flex:1;background:#fff;border:none;padding:9px;font-size:13px;cursor:pointer;font-family:Arial;font-weight:600;color:#888}
+.modal-tab.active{background:#111;color:#fff}
+.form-group{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.form-group label{font-size:12px;font-weight:700;color:#666}
+.form-group input,.form-group textarea{font-size:14px;padding:9px 11px;border-radius:8px;border:1px solid #ddd;font-family:Arial;background:#fff}
+.form-group textarea{min-height:90px;resize:vertical}
+.hint{font-size:12px;color:#aaa;margin-top:4px;line-height:1.5}
+.modal-actions{display:flex;gap:8px;margin-top:1rem}
+.drop-zone{border:2px dashed #ddd;border-radius:10px;padding:2rem;text-align:center;cursor:pointer;background:#fafafa}
+.drop-zone:hover{border-color:#111;background:#f0f0f0}
+.preview-img{width:100%;border-radius:8px;margin-top:10px;max-height:200px;object-fit:cover}
+.ai-result{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px;margin-top:10px;font-size:13px;line-height:1.8}
+.ai-loading{text-align:center;padding:1rem;color:#888;font-size:13px}
+.spinner{display:inline-block;width:18px;height:18px;border:2px solid #ddd;border-top-color:#333;border-radius:50%;animation:spin .8s linear infinite;vertical-align:middle;margin-left:6px}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🍷 מעקב הזמנות בקבוקים</h1>
+  <div id="alert-bar"></div>
+  <div class="stats">
+    <div class="stat"><div class="stat-label">הזמנות פתוחות</div><div class="stat-val warn" id="s-open">0</div></div>
+    <div class="stat"><div class="stat-label">בקבוקים חסרים</div><div class="stat-val danger" id="s-missing">0</div></div>
+    <div class="stat"><div class="stat-label">הגיעו במלואן</div><div class="stat-val ok" id="s-done">0</div></div>
+  </div>
+  <div class="top-row">
+    <div class="tabs">
+      <button class="tab active" onclick="showTab('open')">הזמנות פתוחות</button>
+      <button class="tab" onclick="showTab('done')">הגיעו במלואן</button>
+    </div>
+    <button class="btn primary" onclick="openModal()">+ הזמנה חדשה</button>
+  </div>
+  <div class="orders-list" id="orders-list"></div>
+</div>
+
+<!-- מודל -->
+<div class="modal-bg" id="modal" onclick="closeModalBg(event)">
+  <div class="modal">
+    <h2>הזמנה חדשה</h2>
+    <div class="modal-tabs">
+      <button class="modal-tab active" onclick="switchTab('manual')">✏️ ידני</button>
+      <button class="modal-tab" onclick="switchTab('paste')">📋 הדבקת טקסט</button>
+      <button class="modal-tab" onclick="switchTab('image')">📷 תמונה</button>
+    </div>
+
+    <div id="tab-manual">
+      <div class="form-group"><label>מספר הזמנה *</label><input type="text" id="f-num" placeholder="60155"></div>
+      <div class="form-group"><label>שם הפרויקט *</label><input type="text" id="f-name" placeholder="יוני1 - בלנד לבן גארסיה"></div>
+      <div class="form-group"><label>תאריך</label><input type="date" id="f-date"></div>
+      <div class="form-group"><label>נקודת איסוף</label><input type="text" id="f-pickup" placeholder="גינוסר 0"></div>
+      <div class="form-group"><label>סכום (₪)</label><input type="number" id="f-amount" placeholder="0"></div>
+      <div class="form-group">
+        <label>בקבוקים — כל שורה = פריט אחד</label>
+        <textarea id="f-items" placeholder="6 בלנד לבן גארסיה 28&#10;3 שבוע ישראלי סתיו רוזה"></textarea>
+        <div class="hint">פורמט: כמות + שם. למשל: 6 בלנד לבן גארסיה 28</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn primary" onclick="saveManual()">שמור</button>
+        <button class="btn" onclick="closeModal()">ביטול</button>
+      </div>
+    </div>
+
+    <div id="tab-paste" style="display:none">
+      <div class="form-group">
+        <label>הדביקי כאן את תוכן ההזמנה מהאתר או מהאימייל</label>
+        <textarea id="paste-text" style="min-height:130px;font-size:13px;padding:10px;border-radius:8px;border:1px solid #ddd;font-family:Arial;resize:vertical;width:100%" placeholder="הדביקי כאן..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn primary" onclick="parsePaste()">🔍 נתח וייבא</button>
+        <button class="btn" onclick="closeModal()">ביטול</button>
+      </div>
+      <div id="paste-result"></div>
+    </div>
+
+    <div id="tab-image" style="display:none">
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('img-input').click()" ondragover="event.preventDefault();this.style.borderColor='#111'" ondragleave="this.style.borderColor='#ddd'" ondrop="dropImg(event)">
+        <div style="font-size:32px">📷</div>
+        <p style="font-size:13px;color:#888;margin-top:8px">לחצי להעלאת תמונה / צילום מסך<br>או גררי לכאן</p>
+        <input type="file" id="img-input" accept="image/*" style="display:none" onchange="handleImg(event)">
+      </div>
+      <img id="preview-img" class="preview-img" style="display:none">
+      <div id="ai-status"></div>
+      <div id="ai-result-box"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORE_KEY='bakbookim_v5';
+let orders=[];
+let currentTab='open';
+
+function load(){ try{ orders=JSON.parse(localStorage.getItem(STORE_KEY)||'[]'); }catch(e){ orders=[]; } }
+function save(){ localStorage.setItem(STORE_KEY,JSON.stringify(orders)); }
+function daysSince(d){ if(!d) return 0; return Math.floor((Date.now()-new Date(d))/86400000); }
+
+function parseItemsText(text){
+  return text.split('\n').map(l=>l.trim()).filter(Boolean).map(line=>{
+    const m=line.match(/^(\d+)\s+(.+)/);
+    if(m) return {name:m[2].trim(),qty:parseInt(m[1]),arrived:false};
+    return {name:line,qty:1,arrived:false};
+  });
+}
+
+function isFullyArrived(o){ return o.items&&o.items.length>0&&o.items.every(i=>i.arrived); }
+function missingItems(o){ return (o.items||[]).filter(i=>!i.arrived); }
+
+function showTab(t){
+  currentTab=t;
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('active',['open','done'][i]===t));
+  render();
+}
+
+function render(){
+  let list=orders.filter(o=>currentTab==='done'?isFullyArrived(o):!isFullyArrived(o))
+    .sort((a,b)=>new Date(b.date)-new Date(a.date));
+
+  const el=document.getElementById('orders-list');
+  if(!list.length){
+    el.innerHTML=currentTab==='open'
+      ?'<div class="empty">אין הזמנות פתוחות 🎉<br><br><button class="btn primary" onclick="openModal()">+ הוסיפי הזמנה</button></div>'
+      :'<div class="empty">עדיין אין הזמנות שהגיעו במלואן</div>';
+    updateStats(); return;
+  }
+
+  el.innerHTML=list.map(o=>{
+    const items=o.items||[];
+    const total=items.length;
+    const done=items.filter(i=>i.arrived).length;
+    const missing=items.filter(i=>!i.arrived);
+    const pct=total>0?Math.round(done/total*100):0;
+    const days=daysSince(o.date);
+    const isOverdue=!isFullyArrived(o)&&days>30;
+    let badgeClass='pending', badgeLabel='ממתין';
+    if(done>0&&done<total){ badgeClass='partial'; badgeLabel='הגיע חלקית'; }
+    if(isFullyArrived(o)){ badgeClass='arrived'; badgeLabel='הגיע ✓'; }
+
+    const missingHtml=missing.length>0&&done>0?`<div class="missing-box"><strong>❌ חסר:</strong>${missing.map(i=>`${i.qty}× ${i.name}`).join(' | ')}</div>`:'';
+
+    const itemsHtml=items.map((item,idx)=>`
+      <div class="item-row ${item.arrived?'done':''}">
+        <input type="checkbox" class="item-check" ${item.arrived?'checked':''} onchange="toggleItem('${o.id}',${idx},this.checked)">
+        <span class="item-name ${item.arrived?'checked':''}">${item.name}</span>
+        <span class="item-qty">×${item.qty}</span>
+      </div>`).join('');
+
+    return `<div class="order-card ${isOverdue?'overdue':''}" id="card-${o.id}">
+      <div class="order-header" onclick="toggleCard('${o.id}')">
+        <div style="flex:1;min-width:0">
+          <div class="order-num">הזמנה #${o.num}</div>
+          <div class="order-sub">${o.name}${o.date?' · '+o.date:''}${o.pickup?' · '+o.pickup:''}${o.amount?' · ₪'+o.amount:''}${isOverdue?` · <span style="color:#c0392b;font-weight:700">${days} ימים!</span>`:''}</div>
+          ${total>0?`<div class="progress-wrap"><div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div><span class="progress-txt">${done}/${total} הגיעו</span></div>`:''}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-shrink:0">
+          <span class="badge ${badgeClass}">${badgeLabel}</span>
+          <span class="chevron" id="chev-${o.id}">▼</span>
+        </div>
+      </div>
+      <div class="order-body" id="body-${o.id}">
+        ${missingHtml}
+        <div class="project-block">
+          <div class="project-name">📦 ${o.name}</div>
+          <div class="items-list">${itemsHtml||'<div style="font-size:13px;color:#aaa">אין פריטים — הוסיפי ידנית</div>'}</div>
+        </div>
+        <div class="add-row">
+          <input type="number" class="narrow" id="qty-${o.id}" value="1" min="1" placeholder="כמות">
+          <input type="text" class="wide" id="newitem-${o.id}" placeholder="הוסיפי פריט..." onkeydown="if(event.key==='Enter')addItem('${o.id}')">
+          <button class="btn sm" onclick="addItem('${o.id}')">+ הוסף</button>
+        </div>
+        <div class="action-row">
+          <button class="btn success sm" onclick="markAll('${o.id}')">✓ הכל הגיע</button>
+          <button class="btn danger sm" onclick="deleteOrder('${o.id}')">🗑 מחק</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  updateStats();
+}
+
+function toggleCard(id){
+  document.getElementById('body-'+id).classList.toggle('open');
+  document.getElementById('chev-'+id).classList.toggle('open');
+}
+function reopenCard(id){ setTimeout(()=>{ document.getElementById('body-'+id)?.classList.add('open'); document.getElementById('chev-'+id)?.classList.add('open'); },20); }
+function toggleItem(oid,idx,checked){
+  const o=orders.find(x=>x.id===oid); if(!o||!o.items) return;
+  o.items[idx].arrived=checked; save(); render(); reopenCard(oid);
+}
+function addItem(oid){
+  const o=orders.find(x=>x.id===oid); if(!o) return;
+  const name=document.getElementById('newitem-'+oid).value.trim();
+  const qty=parseInt(document.getElementById('qty-'+oid).value)||1;
+  if(!name) return;
+  if(!o.items) o.items=[];
+  o.items.push({name,qty,arrived:false}); save(); render(); reopenCard(oid);
+}
+function markAll(oid){
+  const o=orders.find(x=>x.id===oid); if(!o) return;
+  if(!o.items||o.items.length===0){ alert('אין פריטים — הוסיפי פריטים תחילה'); return; }
+  o.items.forEach(i=>i.arrived=true); save(); render();
+}
+function deleteOrder(id){ if(!confirm('למחוק הזמנה זו?')) return; orders=orders.filter(x=>x.id!==id); save(); render(); }
+
+function updateStats(){
+  const open=orders.filter(o=>!isFullyArrived(o)).length;
+  const done=orders.filter(o=>isFullyArrived(o)).length;
+  const missing=orders.filter(o=>!isFullyArrived(o)).reduce((s,o)=>s+missingItems(o).length,0);
+  document.getElementById('s-open').textContent=open;
+  document.getElementById('s-missing').textContent=missing;
+  document.getElementById('s-done').textContent=done;
+  const ov=orders.filter(o=>!isFullyArrived(o)&&daysSince(o.date)>30).length;
+  document.getElementById('alert-bar').innerHTML=ov>0?`<div class="alert">⚠️ ${ov} הזמנות פתוחות ממתינות מעל 30 יום!</div>`:'';
+}
+
+function openModal(){
+  document.getElementById('modal').classList.add('open');
+  document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
+  switchTab('manual');
+}
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+function closeModalBg(e){ if(e.target===document.getElementById('modal')) closeModal(); }
+
+function switchTab(t){
+  ['manual','paste','image'].forEach(id=>document.getElementById('tab-'+id).style.display=id===t?'block':'none');
+  document.querySelectorAll('.modal-tab').forEach((el,i)=>el.classList.toggle('active',['manual','paste','image'][i]===t));
+  document.getElementById('paste-result').innerHTML='';
+  document.getElementById('ai-result-box').innerHTML='';
+  document.getElementById('ai-status').innerHTML='';
+  document.getElementById('preview-img').style.display='none';
+  document.getElementById('drop-zone').style.display='block';
+}
+
+function addOrderToList(data){
+  orders.push({id:Date.now().toString()+Math.random().toString(36).slice(2),...data});
+  save(); render(); closeModal();
+}
+
+function saveManual(){
+  const num=document.getElementById('f-num').value.trim();
+  const name=document.getElementById('f-name').value.trim();
+  if(!num||!name){ alert('יש למלא מספר הזמנה ושם פרויקט'); return; }
+  const itemsText=document.getElementById('f-items').value.trim();
+  addOrderToList({num,name,date:document.getElementById('f-date').value,pickup:document.getElementById('f-pickup').value.trim(),amount:document.getElementById('f-amount').value,items:itemsText?parseItemsText(itemsText):[]});
+  ['f-num','f-name','f-pickup','f-amount','f-items'].forEach(id=>document.getElementById(id).value='');
+}
+
+function parsePaste(){
+  const text=document.getElementById('paste-text').value.trim();
+  if(!text){ alert('אנא הדביקי טקסט'); return; }
+  const res=document.getElementById('paste-result');
+  res.innerHTML='<div class="ai-loading"><span class="spinner"></span> מנתח...</div>';
+
+  const numMatch=text.match(/הזמנה\s*#([\d\-]+)/)||text.match(/#([\d\-]+)/)||text.match(/מספר\s*([\d\-]+)/);
+  const num=numMatch?numMatch[1]:'';
+
+  const dateHe=text.match(/(\d{1,2})\s+ב?(ינואר|פברואר|מרץ|אפריל|מאי|יוני|יולי|אוגוסט|ספטמבר|אוקטובר|נובמבר|דצמבר)\s+(\d{4})/);
+  const monthMap={ינואר:'01',פברואר:'02','מרץ':'03',אפריל:'04',מאי:'05',יוני:'06',יולי:'07',אוגוסט:'08',ספטמבר:'09',אוקטובר:'10',נובמבר:'11',דצמבר:'12'};
+  let date=new Date().toISOString().split('T')[0];
+  if(dateHe) date=`${dateHe[3]}-${monthMap[dateHe[2]]}-${dateHe[1].padStart(2,'0')}`;
+
+  const amounts=[...text.matchAll(/([\d,]+\.\d+)\s*₪/g)].map(m=>parseFloat(m[1].replace(',','')));
+  const amount=amounts.length>0?Math.max(...amounts).toFixed(2):'';
+
+  const pickupMatch=text.match(/גינוסר[^\n)#]*/i)||text.match(/נקודת[^:\n]*[:\s]+([^\n]+)/);
+  const pickup=pickupMatch?pickupMatch[0].replace(/^.*:\s*/,'').trim():'';
+
+  // פרויקט — שורה שמכילה יוני/מאי/אפר וכו'
+  const projMatch=text.match(/(ינו|פבר|מרץ|אפר|מאי|יוני|יולי|אוג|ספט|אוק|נוב|דצ)\w*\d*\s*[-–]\s*[^\n\t₪\d]+/i);
+  const name=projMatch?projMatch[0].trim():'הזמנה מבקבוקים';
+
+  // פריטים — זיהוי שם + כמות מפורמט האתר
+  // פורמט: שם מוצר בשורה אחת, אחריה: מחיר TAB כמות TAB סך
+  const skipPattern=/מוצר|מק"ט|מחיר|כמות|סך|משלוח|מיסים|VAT|אספתי|הזמנה #|נוצר|בתאריך/;
+  const items=[];
+  const lines=text.split('\n').map(l=>l.trim()).filter(Boolean);
+  for(let i=0;i<lines.length;i++){
+    const line=lines[i];
+    if(skipPattern.test(line)) continue;
+    if(!/[\u05D0-\u05EA]/.test(line)||line.length<4) continue;
+    if(/^[\d.,₪\s]+$/.test(line)) continue;
+    // כמות — מחפש בשורה הבאה: "29.00 ₪	6	174.00 ₪" — הכמות בין שני המחירים
+    const nextLine=lines[i+1]||'';
+    const tabQty=nextLine.match(/[\d.]+\s*₪?\s+([\d]+)\s+[\d.]+/);
+    const simpleQty=nextLine.match(/^([\d]+)\s+[\d]/);
+    const inlineQty=line.match(/^([\d]+)\s/);
+    const qty=tabQty?parseInt(tabQty[1]):simpleQty?parseInt(simpleQty[1]):inlineQty?parseInt(inlineQty[1]):1;
+    const cleanName=line.replace(/^(\d+)\s/,'').trim();
+    if(cleanName.length>3) items.push({name:cleanName,qty,arrived:false});
+  }
+
+  setTimeout(()=>{
+    res.innerHTML=`<div class="ai-result">
+      <strong>זוהו הפרטים:</strong><br>
+      מספר הזמנה: <strong>#${num||'לא זוהה'}</strong><br>
+      פרויקט: ${name}<br>
+      תאריך: ${date}<br>
+      נקודת איסוף: ${pickup||'לא זוהה'}<br>
+      סכום: ${amount?'₪'+amount:'לא זוהה'}<br>
+      פריטים (${items.length}): ${items.length>0?items.map(i=>`${i.qty}× ${i.name}`).join(' | '):'לא זוהו'}<br><br>
+      <button class="btn primary" onclick='confirmPaste(${JSON.stringify({num,name,date,pickup,amount,items})})'>✓ אשרי וייבאי</button>
+    </div>`;
+  },300);
+}
+
+function confirmPaste(data){ addOrderToList(data); }
+
+function dropImg(e){ e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) processImg(f); }
+function handleImg(e){ const f=e.target.files[0]; if(f) processImg(f); }
+function processImg(file){
+  const r=new FileReader();
+  r.onload=async e=>{ const b64=e.target.result; document.getElementById('preview-img').src=b64; document.getElementById('preview-img').style.display='block'; document.getElementById('drop-zone').style.display='none'; await analyzeImg(b64.split(',')[1]); };
+  r.readAsDataURL(file);
+}
+async function analyzeImg(b64){
+  document.getElementById('ai-status').innerHTML='<div class="ai-loading"><span class="spinner"></span> Claude קורא את התמונה...</div>';
+  document.getElementById('ai-result-box').innerHTML='';
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:[{type:'image',source:{type:'base64',media_type:'image/jpeg',data:b64}},{type:'text',text:`זהו צילום מסך של הזמנה מאתר bakbookim. חלץ את הפרטים בפורמט JSON בלבד ללא markdown:
+{"num":"מספר הזמנה","name":"שם הפרויקט","date":"YYYY-MM-DD","pickup":"נקודת האיסוף","amount":"סכום ללא ₪","items":[{"name":"שם פריט","qty":כמות}]}
+אם שדה לא קיים השאר ריק. חלץ כל פריט בנפרד.`}]}]})});
+    const data=await resp.json();
+    const text=data.content?.[0]?.text||'';
+    let parsed;
+    try{ parsed=JSON.parse(text.replace(/```json|```/g,'').trim()); }catch(e){ throw new Error('לא הצלחתי לקרוא'); }
+    const items=(parsed.items||[]).map(i=>({...i,arrived:false}));
+    document.getElementById('ai-status').innerHTML='';
+    document.getElementById('ai-result-box').innerHTML=`<div class="ai-result">
+      <strong>זוהו הפרטים:</strong><br>
+      מספר: <strong>#${parsed.num||'—'}</strong><br>
+      פרויקט: ${parsed.name||'—'}<br>
+      תאריך: ${parsed.date||'—'}<br>
+      איסוף: ${parsed.pickup||'—'}<br>
+      סכום: ${parsed.amount?'₪'+parsed.amount:'—'}<br>
+      פריטים: ${items.map(i=>`${i.qty}× ${i.name}`).join(' | ')||'לא זוהו'}<br><br>
+      <button class="btn primary" onclick='confirmPaste(${JSON.stringify({num:parsed.num||"",name:parsed.name||"הזמנה",date:parsed.date||new Date().toISOString().split("T")[0],pickup:parsed.pickup||"",amount:parsed.amount||"",items})})'>✓ אשרי וייבאי</button>
+    </div>`;
+  }catch(err){ document.getElementById('ai-status').innerHTML=''; document.getElementById('ai-result-box').innerHTML=`<div style="color:#c0392b;font-size:13px;padding:10px">שגיאה: ${err.message}</div>`; }
+}
+
+load(); render();
+</script>
+</body>
+</html>
